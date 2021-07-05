@@ -126,12 +126,12 @@ class MainWidgets(QMainWindow):
     def copyVideoUrl(self):
         clipBoard = QApplication.clipboard()
         clipBoard.setText(self.videoLinkNoWm.text())
-        self.stateBar.showMessage(self, "复制成功", 3000)
+        self.stateBar.showMessage("复制视频下载地址成功", 3000)
 
     def copyMusicUrl(self):
         clipBoard = QApplication.clipboard()
         clipBoard.setText(self.musicLink.text())
-        self.stateBar.showMessage(self, "复制成功", 3000)
+        self.stateBar.showMessage("复制音乐下载地址成功", 3000)
 
     def downloadVideoEvent(self):
         if "" == self.videoPath:
