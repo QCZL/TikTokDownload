@@ -228,6 +228,7 @@ class TikTokLinkParse:
 
                 musicUrl = musicInfo["play_url"]["url_list"][0]
                 videoUrl = videoInfo["play_addr"]["url_list"][0]
+                videoUrl = videoUrl.replace("playwm", "play")
                 videoUri = videoInfo["play_addr"]["uri"]
                 self.videoUri = videoUri
                 self.urllist['musicUrl'] = musicUrl
