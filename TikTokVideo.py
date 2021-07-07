@@ -153,7 +153,7 @@ class MainWidgets(QMainWindow):
             QMessageBox.warning(self, "警告", "下载目录不能为空")
             return False
 
-        musicUrl = self.videoLinkNoWm.text()
+        musicUrl = self.musicLink.text()
         if "" == musicUrl:
             QMessageBox.warning(self, "警告", "音乐下载地址为空，请先解析地址")
             return False
@@ -217,10 +217,12 @@ class TikTokLinkParse:
     def getVideoItemInfo(self):
         self.urllist = {}
         videoID = self.getVideoID()
+        print(videoID)
         if videoID is not None:
             videoInfoLink = "https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={}".format(videoID)
             try:
                 response = requests.get(url=videoInfoLink, timeout=5, headers=self.winHeader)
+                print(response.text)
             except Exception as e:
                 print("[Error getVideoItemInfo]", e)
                 return None
@@ -229,9 +231,17 @@ class TikTokLinkParse:
                 videoInfo = itemInfo["item_list"][0]["video"]
                 musicInfo = itemInfo["item_list"][0]["music"]
 
-                musicUrl = musicInfo["play_url"]["url_list"][0]
-                videoUrl = videoInfo["play_addr"]["url_list"][0]
-                videoUrl = videoUrl.replace("playwm", "play")
+                try:
+                    musicUrl = musicInfo["play_url"]["url_list"][0]
+                except IndexError:
+                    musicUrl = ""
+
+                try:
+                    videoUrl = videoInfo["play_addr"]["url_list"][0]
+                    videoUrl = videoUrl.replace("playwm", "play")
+                except IndexError:
+                    videoUrl = ""
+
                 videoUri = videoInfo["play_addr"]["uri"]
                 self.videoUri = videoUri
                 self.urllist['musicUrl'] = musicUrl
