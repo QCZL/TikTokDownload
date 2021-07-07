@@ -147,6 +147,8 @@ class MainWidgets(QMainWindow):
         if result:
             self.stateBar.showMessage("视频下载成功", 5000)
             self.videoDownloadBtn.setDisabled(True)
+        else:
+            self.stateBar.showMessage("下载失败或者文件已经存在", 5000)
 
     def downloadMusicEvent(self):
         if "" == self.musicPath:
@@ -162,6 +164,8 @@ class MainWidgets(QMainWindow):
         if result:
             self.stateBar.showMessage("音乐下载成功", 5000)
             self.musicDownloadBtn.setDisabled(True)
+        else:
+            self.stateBar.showMessage("下载失败或者文件已经存在", 5000)
 
 
 class TikTokLinkParse:
@@ -217,12 +221,10 @@ class TikTokLinkParse:
     def getVideoItemInfo(self):
         self.urllist = {}
         videoID = self.getVideoID()
-        print(videoID)
         if videoID is not None:
             videoInfoLink = "https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={}".format(videoID)
             try:
                 response = requests.get(url=videoInfoLink, timeout=5, headers=self.winHeader)
-                print(response.text)
             except Exception as e:
                 print("[Error getVideoItemInfo]", e)
                 return None
@@ -266,6 +268,9 @@ class TikTokLinkParse:
                 print("[Error downloadVideo]", e)
                 return None
             else:
+                if os.path.isfile(filename):
+                    return False
+
                 filename = wget.download(url=location, out=filename)
                 if filename is not None:
                     return True
@@ -276,6 +281,9 @@ class TikTokLinkParse:
         musicUrl = self.urllist['musicUrl']
         filename = path + "/" + self.videoUri + ".mp3"
         if "" == musicUrl:
+            return False
+
+        if os.path.isfile(filename):
             return False
 
         filename = wget.download(url=musicUrl, out=filename)
