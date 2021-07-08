@@ -173,7 +173,7 @@ class TikTokLinkParse:
         self.winHeader = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        self.videoUri = ""
+        self.videoID = ""
         self.urllist = {
             "videoUrl": "",
             "musicUrl": ""
@@ -214,7 +214,7 @@ class TikTokLinkParse:
                         pathSpilt = path.split('/')
                         try:
                             return pathSpilt[-2]
-                        except TypeError as e:
+                        except IndexError as e:
                             print(e)
                             return None
 
@@ -244,15 +244,14 @@ class TikTokLinkParse:
                 except IndexError:
                     videoUrl = ""
 
-                videoUri = videoInfo["play_addr"]["uri"]
-                self.videoUri = videoUri
+                self.videoID = videoID
                 self.urllist['musicUrl'] = musicUrl
                 self.urllist["videoUrl"] = videoUrl
                 return self.urllist
 
     def downloadVideo(self, path):
         videoUrl = self.urllist['videoUrl']
-        filename = path + "/" + self.videoUri + ".mp4"
+        filename = path + "/" + self.videoID + ".mp4"
         if "" == videoUrl:
             return False
 
@@ -279,7 +278,7 @@ class TikTokLinkParse:
 
     def downloadMusic(self, path):
         musicUrl = self.urllist['musicUrl']
-        filename = path + "/" + self.videoUri + ".mp3"
+        filename = path + "/" + self.videoID + ".mp3"
         if "" == musicUrl:
             return False
 
