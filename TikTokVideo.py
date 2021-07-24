@@ -14,6 +14,7 @@ import logging
 import urllib.parse
 
 import requests
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import *
 
 
@@ -53,8 +54,9 @@ class TikTokUI(QMainWindow):
         self.TikTok = TikTokLinkParse()
 
     def InitUI(self):
-        self.setWindowTitle('抖音视频无水印下载器')
         self.resize(800, 600)
+        self.setWindowTitle('抖音视频无水印下载器')
+        self.setWindowIcon(QIcon("tiktok.ico"))
         # 状态栏
         self.stateBar = self.statusBar()
         self.setStatusBar(self.stateBar)
