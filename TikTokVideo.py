@@ -1,102 +1,143 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# 开发团队  :  chengc
 # 开发人员  :  chengc
-# 开发时间  :  2021/7/5 20:29
-# 文件名称  :  TikTokVideo.py
+# 开发时间  :  2021/7/24 17:15
+# 文件名称  :  TikTok.py
 # 开发工具  :  PyCharm
 
 import os
 import re
 import sys
-import wget
 import json
-import requests
+import logging
 import urllib.parse
+
+import requests
 from PyQt5.QtWidgets import *
 
 
-class MainWidgets(QMainWindow):
-    def __init__(self):
-        self.tikTok = TikTokLinkParse()
-        self.videoPath = ""
-        self.musicPath = ""
-        super(MainWidgets, self).__init__()
-        self.initUI()
+def DownloadFile(url, path):
+    if path == "" or url == "":
+        return False
 
-    def initUI(self):
+    winHeader = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
+    try:
+        response = requests.get(url=url, headers=winHeader, allow_redirects=True, stream=True)
+    except requests.exceptions as e:
+        logging.error(e)
+        return False
+    else:
+        total_size = int(response.headers['Content-Length'])
+        if total_size == 0:
+            return False
+        with open(path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=102400):
+                if chunk:
+                    f.write(chunk)
+        return True
+
+
+class TikTokUI(QMainWindow):
+    def __init__(self):
+        super(TikTokUI, self).__init__()
+        self.InitUI()
+        self.save_path = None
+        self.item_info = None
+        self.videoPath = None
+        self.musicPath = None
+        self.imagesPath = None
+        self.TikTok = TikTokLinkParse()
+
+    def InitUI(self):
+        self.setWindowTitle('抖音视频无水印下载器')
         self.resize(800, 600)
-        self.setWindowTitle('抖音视频下载器')
+        # 状态栏
         self.stateBar = self.statusBar()
         self.setStatusBar(self.stateBar)
 
-        # 垂直布局
-        widget = QWidget()
-        v_layout = QVBoxLayout()
+        # 主布局，是一个纵向布局
+        main_layout = QVBoxLayout()
 
-        # 水平布局 下载地址
+        # 子布局，横向布局
         h_layout = QHBoxLayout()
-        self.downloadPath = QLineEdit()
-        self.downloadPath.setPlaceholderText('下载目录')
-        self.pathBtn = QPushButton('选择目录')
-        self.pathBtn.clicked.connect(self.selectDownloadPath)
-        h_layout.addWidget(self.downloadPath)
-        h_layout.addWidget(self.pathBtn)
-        v_layout.addLayout(h_layout)
+        self.pathInputEdit = QLineEdit()
+        self.pathInputEdit.setPlaceholderText('请先设置保存路径')
+        self.selectPathBtn = QPushButton("选择目录")
+        self.selectPathBtn.clicked.connect(self.eventSelectSavePath)
+        h_layout.addWidget(self.pathInputEdit)
+        h_layout.addWidget(self.selectPathBtn)
+        main_layout.addLayout(h_layout)
 
-        # 分享链接输入框
         self.shareLinkEdit = QTextEdit()
-        self.shareLinkEdit.setPlaceholderText('请输入抖音的分享链接')
-        v_layout.addWidget(self.shareLinkEdit)
+        self.shareLinkEdit.setPlaceholderText('在此处输入抖音视频的分享链接')
+        main_layout.addWidget(self.shareLinkEdit)
 
-        self.parseLinkBtn = QPushButton('解析地址')
-        self.parseLinkBtn.clicked.connect(self.parseLink)
-        v_layout.addWidget(self.parseLinkBtn)
+        self.parseShareLinkBtn = QPushButton("解析链接")
+        self.parseShareLinkBtn.clicked.connect(self.eventParseShareLink)
+        main_layout.addWidget(self.parseShareLinkBtn)
 
-        # 水平布局 显示解析出的视频地址
         h_layout = QHBoxLayout()
-        self.videoLinkNoWm = QLineEdit('此处显示视频的无水印地址')
-        self.videoBtnNoWm = QPushButton('复制视频地址')
-        self.videoBtnNoWm.setDisabled(True)
-        self.videoBtnNoWm.clicked.connect(self.copyVideoUrl)
-        h_layout.addWidget(self.videoLinkNoWm)
-        h_layout.addWidget(self.videoBtnNoWm)
-        v_layout.addLayout(h_layout)
+        self.videoLinkEdit = QLineEdit()
+        self.videoLinkEdit.setPlaceholderText('此处将显示视频真实下载地址')
+        self.copyVideoLinkBtn = QPushButton('复制视频下载地址')
+        self.copyVideoLinkBtn.clicked.connect(self.eventCopyVideoLink)
+        h_layout.addWidget(self.videoLinkEdit)
+        h_layout.addWidget(self.copyVideoLinkBtn)
+        main_layout.addLayout(h_layout)
 
-        # 水平布局 显示视频背景音乐的地址
         h_layout = QHBoxLayout()
-        self.musicLink = QLineEdit('此处显示视频背景音乐的地址')
-        self.musicBtn = QPushButton('复制音乐地址')
-        self.musicBtn.setDisabled(True)
-        self.musicBtn.clicked.connect(self.copyMusicUrl)
-        h_layout.addWidget(self.musicLink)
-        h_layout.addWidget(self.musicBtn)
-        v_layout.addLayout(h_layout)
+        self.musicLinkEdit = QLineEdit()
+        self.musicLinkEdit.setPlaceholderText('此处将显示背景音乐下载地址')
+        self.copyMusicLinkBtn = QPushButton('复制音乐下载地址')
+        self.copyMusicLinkBtn.clicked.connect(self.eventCopyMusicLink)
+        h_layout.addWidget(self.musicLinkEdit)
+        h_layout.addWidget(self.copyMusicLinkBtn)
+        main_layout.addLayout(h_layout)
 
-        # 水平布局，显示现在按钮
-        self.videoDownloadBtn = QPushButton('下载视频')
-        self.musicDownloadBtn = QPushButton('下载背景音乐')
-        self.videoDownloadBtn.setDisabled(True)
-        self.musicDownloadBtn.setDisabled(True)
-        self.videoDownloadBtn.clicked.connect(self.downloadVideoEvent)
-        self.musicDownloadBtn.clicked.connect(self.downloadMusicEvent)
-        v_layout.addWidget(self.videoDownloadBtn)
-        v_layout.addWidget(self.musicDownloadBtn)
+        self.downloadVideoBtn = QPushButton('下载视频')
+        self.downloadVideoBtn.setDisabled(True)
+        self.downloadVideoBtn.clicked.connect(self.eventDownloadVideo)
+        main_layout.addWidget(self.downloadVideoBtn)
 
-        # 设置布局并显示widget
-        widget.setLayout(v_layout)
+        self.downloadMusicBtn = QPushButton('下载背景音乐')
+        self.downloadMusicBtn.setDisabled(True)
+        self.downloadMusicBtn.clicked.connect(self.eventDownloadMisuc)
+        main_layout.addWidget(self.downloadMusicBtn)
+
+        self.downloadImageBtn = QPushButton('下载图集')
+        self.downloadImageBtn.setDisabled(True)
+        self.downloadImageBtn.clicked.connect(self.eventDownloadImage)
+        main_layout.addWidget(self.downloadImageBtn)
+
+        widget = QWidget()
+        widget.setLayout(main_layout)
         self.setCentralWidget(widget)
 
-    def selectDownloadPath(self):
-        path = QFileDialog.getExistingDirectory()
-        # path = QFileDialog.getExistingDirectory(directory=r'F:/04-影音视频')
-        if path != "":
-            path = path + "/TikTok"
+    def eventCopyVideoLink(self):
+        clipBoard = QApplication.clipboard()
+        clipBoard.setText(self.videoLinkEdit.text())
+        self.stateBar.showMessage("复制视频下载地址成功", 3000)
+
+    def eventCopyMusicLink(self):
+        clipBoard = QApplication.clipboard()
+        clipBoard.setText(self.musicLinkEdit.text())
+        self.stateBar.showMessage("复制视频下载地址成功", 3000)
+
+    def eventSelectSavePath(self):
+        self.save_path = QFileDialog.getExistingDirectory()
+        if self.save_path != "":
+            path = self.save_path + "/抖音"
             if not os.path.exists(path):
                 os.mkdir(path)
-            self.downloadPath.setText(path)
+            self.pathInputEdit.setText(path)
 
-            self.videoPath = path + "/video"
-            self.musicPath = path + "/music"
+            self.videoPath = path + "/视频"
+            self.musicPath = path + "/音乐"
+            self.imagesPath = path + "/图片"
 
             if not os.path.exists(self.videoPath):
                 os.mkdir(self.videoPath)
@@ -104,68 +145,87 @@ class MainWidgets(QMainWindow):
             if not os.path.exists(self.musicPath):
                 os.mkdir(self.musicPath)
 
-    def parseLink(self):
-        shareLink = self.shareLinkEdit.toPlainText()
-        if "" == shareLink:
-            QMessageBox.warning(self, "警告", "分享链接不能为空")
-            return None
+            if not os.path.exists(self.imagesPath):
+                os.mkdir(self.imagesPath)
 
-        self.tikTok.setShareLink(shareLink)
-        urllist = self.tikTok.getVideoItemInfo()
-        if urllist is None:
-            QMessageBox.warning(self, "警告", "链接解析出错")
-            return None
+    def eventParseShareLink(self):
+        linkText = self.shareLinkEdit.toPlainText()
+        if linkText == "":
+            self.stateBar.showMessage("链接不能为空", 3000)
         else:
-            self.videoLinkNoWm.setText(urllist['videoUrl'])
-            self.musicLink.setText(urllist['musicUrl'])
-            self.musicBtn.setDisabled(False)
-            self.videoBtnNoWm.setDisabled(False)
-            self.videoDownloadBtn.setDisabled(False)
-            self.musicDownloadBtn.setDisabled(False)
+            self.TikTok.setShareLink(linkText)
+            self.item_info = self.TikTok.getVideoItemInfo()
+            if self.item_info['video_url'] is not None:
+                self.downloadVideoBtn.setDisabled(False)
+                self.videoLinkEdit.setText(self.item_info['video_url'])
 
-    def copyVideoUrl(self):
-        clipBoard = QApplication.clipboard()
-        clipBoard.setText(self.videoLinkNoWm.text())
-        self.stateBar.showMessage("复制视频下载地址成功", 3000)
+            if self.item_info['music_url'] is not None:
+                self.downloadMusicBtn.setDisabled(False)
+                self.musicLinkEdit.setText(self.item_info['music_url'])
 
-    def copyMusicUrl(self):
-        clipBoard = QApplication.clipboard()
-        clipBoard.setText(self.musicLink.text())
-        self.stateBar.showMessage("复制音乐下载地址成功", 3000)
+            if self.item_info['image_list'] is not None:
+                self.downloadImageBtn.setDisabled(False)
 
-    def downloadVideoEvent(self):
-        if "" == self.videoPath:
+    def eventDownloadVideo(self):
+        if self.save_path is None:
             QMessageBox.warning(self, "警告", "下载目录不能为空")
-            return False
-
-        videoUrl = self.videoLinkNoWm.text()
-        if "" == videoUrl:
-            QMessageBox.warning(self, "警告", "视频下载地址为空，请先解析地址")
-            return False
-
-        result = self.tikTok.downloadVideo(self.videoPath)
-        if result:
-            self.stateBar.showMessage("视频下载成功", 5000)
-            self.videoDownloadBtn.setDisabled(True)
         else:
-            self.stateBar.showMessage("下载失败或者文件已经存在", 5000)
+            mid = self.item_info['mid']
+            video_url = self.item_info['video_url']
+            if mid is not None:
+                filename = "{}/{}.mp4".format(self.videoPath, mid)
+                if os.path.isfile(filename):
+                    self.stateBar.showMessage("视频文件已经存在", 3000)
+                else:
+                    reslut = DownloadFile(video_url, filename)
+                    if reslut:
+                        self.stateBar.showMessage("视频下载成功", 3000)
+                    else:
+                        self.stateBar.showMessage("视频下载失败", 3000)
+            else:
+                self.stateBar.showMessage("视频信息错误", 3000)
+        self.downloadVideoBtn.setDisabled(True)
 
-    def downloadMusicEvent(self):
-        if "" == self.musicPath:
+    def eventDownloadMisuc(self):
+        if self.save_path is None:
             QMessageBox.warning(self, "警告", "下载目录不能为空")
-            return False
-
-        musicUrl = self.musicLink.text()
-        if "" == musicUrl:
-            QMessageBox.warning(self, "警告", "音乐下载地址为空，请先解析地址")
-            return False
-
-        result = self.tikTok.downloadMusic(self.musicPath)
-        if result:
-            self.stateBar.showMessage("音乐下载成功", 5000)
-            self.musicDownloadBtn.setDisabled(True)
         else:
-            self.stateBar.showMessage("下载失败或者文件已经存在", 5000)
+            mid = self.item_info['mid']
+            music_url = self.item_info['music_url']
+            if mid is not None:
+                filename = "{}/{}.mp3".format(self.musicPath, mid)
+                if os.path.isfile(filename):
+                    self.stateBar.showMessage("音乐文件已经存在", 3000)
+                else:
+                    reslut = DownloadFile(music_url, filename)
+                    if reslut:
+                        self.stateBar.showMessage("背景音乐下载成功", 3000)
+                    else:
+                        self.stateBar.showMessage("背景音乐下载失败", 3000)
+            else:
+                self.stateBar.showMessage("音乐信息错误", 3000)
+        self.downloadMusicBtn.setDisabled(True)
+
+    def eventDownloadImage(self):
+        if self.save_path is None:
+            QMessageBox.warning(self, "警告", "下载目录不能为空")
+        else:
+            image_list = self.item_info['image_list']
+            image_num = len(image_list)
+            for i in range(image_num):
+                image_url = image_list[i][1]
+                filename = "{}/{}.jpg".format(self.imagesPath, image_list[i][0])
+                if os.path.isfile(filename):
+                    self.stateBar.showMessage("图片已经存在", 3000)
+                else:
+                    reslut = DownloadFile(image_url, filename)
+                    if reslut:
+                        info = "共{}张图片，第{}张下载成功".format(image_num, i + 1)
+                        self.stateBar.showMessage(info)
+                    else:
+                        info = "共{}张图片，第{}张下载失败".format(image_num, i + 1)
+                        self.stateBar.showMessage(info)
+        self.downloadImageBtn.setDisabled(True)
 
 
 class TikTokLinkParse:
@@ -173,127 +233,87 @@ class TikTokLinkParse:
         self.winHeader = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        self.videoID = ""
-        self.urllist = {
-            "videoUrl": "",
-            "musicUrl": ""
-        }
         self.tikTokShareLink = ""
 
     def setShareLink(self, link):
         self.tikTokShareLink = link
 
-    def getTikTokUrl(self):
+    def getShareLink(self):
+        link = None
         compile = re.compile(r"(https?|http?)://(\w|\.|/|\?|&|=)+")
         try:
-            url = re.search(compile, self.tikTokShareLink).group()
+            link = re.search(compile, self.tikTokShareLink).group()
         except AttributeError as e:
-            print("[Error getTikTokUrl]", e)
-            return None
-        else:
-            return url
+            logging.error(e)
+        finally:
+            return link
 
-    def getVideoID(self):
-        shareUrl = self.getTikTokUrl()
-        if shareUrl is not None:
+    def getTikTokMid(self):
+        mid = None
+        link = self.getShareLink()
+        if link is not None:
             try:
-                response = requests.get(url=shareUrl, timeout=5, headers=self.winHeader, allow_redirects=False)
+                response = requests.get(url=link, headers=self.winHeader, allow_redirects=False)
             except requests.exceptions as e:
-                print(e)
-                return None
-            else:
+                logging.error(e)
+            finally:
                 if response.status_code == 302:
+                    Location = response.headers['Location']
+                    path = urllib.parse.urlsplit(Location).path
+                    pathSplit = path.split('/')
                     try:
-                        location = response.headers['location']
-                    except Exception as e:
-                        print("[Error getVideoID]", e)
-                        return None
-                    else:
-                        result = urllib.parse.urlsplit(location)
-                        path = result.path
-                        pathSpilt = path.split('/')
-                        try:
-                            return pathSpilt[-2]
-                        except IndexError as e:
-                            print(e)
-                            return None
+                        mid = pathSplit[-2]
+                    except IndexError as e:
+                        logging.error("获取视频 mid 出错")
+
+        return mid
 
     def getVideoItemInfo(self):
-        self.urllist = {}
-        videoID = self.getVideoID()
-        if videoID is not None:
-            videoInfoLink = "https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={}".format(videoID)
+        item_list = {
+            "mid": None,
+            "video_url": None,
+            "music_url": None,
+            "image_list": None
+        }
+        mid = self.getTikTokMid()
+        if mid is not None:
+            item_list['mid'] = mid
+            url = "https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=" + str(mid)
             try:
-                response = requests.get(url=videoInfoLink, timeout=5, headers=self.winHeader)
-            except Exception as e:
-                print("[Error getVideoItemInfo]", e)
-                return None
+                response = requests.get(url=url, headers=self.winHeader)
+            except requests.exceptions as e:
+                logging.error(e)
             else:
-                itemInfo = json.loads(response.text)
-                videoInfo = itemInfo["item_list"][0]["video"]
-                musicInfo = itemInfo["item_list"][0]["music"]
+                if response.status_code == 200:
+                    item_info = json.loads(response.text)
+                    music_info = item_info["item_list"][0]["music"]
+                    video_info = item_info["item_list"][0]["video"]
+                    image_info = item_info["item_list"][0]["images"]
 
-                try:
-                    musicUrl = musicInfo["play_url"]["url_list"][0]
-                except IndexError:
-                    musicUrl = ""
+                    if music_info is not None:
+                        item_list['music_url'] = music_info['play_url']['url_list'][0]
 
-                try:
-                    videoUrl = videoInfo["play_addr"]["url_list"][0]
-                    videoUrl = videoUrl.replace("playwm", "play")
-                except IndexError:
-                    videoUrl = ""
+                    if video_info is not None:
+                        video_url = video_info['play_addr']['url_list'][0]
+                        item_list['video_url'] = video_url.replace("playwm", "play")
 
-                self.videoID = videoID
-                self.urllist['musicUrl'] = musicUrl
-                self.urllist["videoUrl"] = videoUrl
-                return self.urllist
-
-    def downloadVideo(self, path):
-        videoUrl = self.urllist['videoUrl']
-        filename = path + "/" + self.videoID + ".mp4"
-        if "" == videoUrl:
-            return False
-
-        try:
-            response = requests.get(url=videoUrl, timeout=5, headers=self.winHeader, allow_redirects=False)
-        except Exception as e:
-            print("[Error downloadVideo]", e)
-            return False
-        else:
-            try:
-                location = response.headers['location']
-            except Exception as e:
-                print("[Error downloadVideo]", e)
-                return None
-            else:
-                if os.path.isfile(filename):
-                    return False
-
-                filename = wget.download(url=location, out=filename)
-                if filename is not None:
-                    return True
-                else:
-                    return False
-
-    def downloadMusic(self, path):
-        musicUrl = self.urllist['musicUrl']
-        filename = path + "/" + self.videoID + ".mp3"
-        if "" == musicUrl:
-            return False
-
-        if os.path.isfile(filename):
-            return False
-
-        filename = wget.download(url=musicUrl, out=filename)
-        if filename is not None:
-            return True
-        else:
-            return False
+                    if image_info is not None:
+                        item_list['image_list'] = []
+                        for i in range(len(image_info)):
+                            tmp = []
+                            uri = image_info[i]['uri'].split('/')[-1]
+                            url = image_info[i]['url_list'][0]
+                            tmp.append(uri)
+                            tmp.append(url)
+                            item_list['image_list'].append(tmp)
+        return item_list
 
 
 if __name__ == '__main__':
+    LOG_FORMAT = "%(levelname)s:\t%(message)s"
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+
     app = QApplication(sys.argv)
-    mainWin = MainWidgets()
+    mainWin = TikTokUI()
     mainWin.show()
     sys.exit(app.exec_())
