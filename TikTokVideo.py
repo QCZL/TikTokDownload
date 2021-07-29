@@ -151,6 +151,7 @@ class TikTokUI(QMainWindow):
                 os.mkdir(self.imagesPath)
 
     def eventParseShareLink(self):
+        self.stateBar.clearMessage()
         linkText = self.shareLinkEdit.toPlainText()
         if linkText == "":
             self.stateBar.showMessage("链接不能为空", 3000)
@@ -160,6 +161,8 @@ class TikTokUI(QMainWindow):
             if self.item_info['video_url'] is not None:
                 self.downloadVideoBtn.setDisabled(False)
                 self.videoLinkEdit.setText(self.item_info['video_url'])
+            else:
+                self.stateBar.showMessage("未解析到视频地址", 3000)
 
             if self.item_info['music_url'] is not None:
                 self.downloadMusicBtn.setDisabled(False)
@@ -258,7 +261,7 @@ class TikTokLinkParse:
                 response = requests.get(url=link, headers=self.winHeader, allow_redirects=False)
             except requests.exceptions as e:
                 logging.error(e)
-            finally:
+            else:
                 if response.status_code == 302:
                     Location = response.headers['Location']
                     path = urllib.parse.urlsplit(Location).path
@@ -278,7 +281,7 @@ class TikTokLinkParse:
             "image_list": None
         }
         mid = self.getTikTokMid()
-        if mid is not None:
+        if mid is not None and mid != "":
             item_list['mid'] = mid
             url = "https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=" + str(mid)
             try:
